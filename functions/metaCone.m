@@ -74,6 +74,20 @@ disp(p.Results)
 
 %% INITIALIZATION ===
 %
+
+% Arguments Extraction and Initialization
+S        = full(p.Results.model.S);
+lb       = p.Results.model.lb;
+ub       = p.Results.model.ub;
+vTol     = p.Results.vTol;
+eTol     = p.Results.eTol;
+Alpha    = p.Results.Alpha;
+Nullity  = p.Results.Nullity;
+bioIDX   = p.Results.biomassIndex;
+ExRxns   = p.Results.Exchanges;
+Modality = p.Results.Modality;
+
+spy(S)
 end
 
 
