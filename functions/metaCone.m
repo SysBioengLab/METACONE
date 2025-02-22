@@ -9,7 +9,8 @@ function [CC, Output] = metaCone(model, varargin)
 % estimated nullity of the 'exchange' elementary matrix, the exhange
 % reactions, and the elementary matrix itself.
 % Optional inputs should be fed to the function as key-value pairs.
-% The function will detect the exchange reactions if not provided. 
+% The function will detect the exchange reactions, if not provided. 
+% The function will select the first biomass rxn found, if not provided.
 %
 % USAGE:
 %
@@ -105,8 +106,25 @@ if bioIDX == 0
     bioIDX = bioIDX(1);
 end
 
+% Optional Calculation of the Elementary Matrix ---
+if Nullity
+    try
+        [ME, EMCons] = buildElementaryMatrixCons(model, ExRxnIDs);
+        nullity      = size(null(EMCons(:,ExRxnIDs)),2);
+    catch
+        ErrorMessage1 = "It was not possible to calculate the Elementary Matrix";
+        disp(ErrorMessage1)
+        nullity      = NaN;
+        ME           = ErrorMessage1;
+        EMCons       = NaN;
+    end
+else % default
+    nullity = NaN;
+end
+
 disp(ExRxnIDs)
-disp()
+disp(bioIDX)
+disp(nullity)
 
 end
 
