@@ -9,6 +9,7 @@ function [CC, Output] = metaCone(model, varargin)
 % estimated nullity of the 'exchange' elementary matrix, the exhange
 % reactions, and the elementary matrix itself.
 % Optional inputs should be fed to the function as key-value pairs.
+% The function will detect the exchange reactions if not provided. 
 %
 % USAGE:
 %
@@ -27,6 +28,7 @@ function [CC, Output] = metaCone(model, varargin)
 %       * Alpha     : a double between 0 and 1. 
 %       * Modality  : 'full' or 'fast'
 %       * biomassIndex  : biomass flux exchange index (integer)
+%       * Exchanges : array (vector) with the exchanges (indices) of the model
 %       * vTol      : zero flux tolerance (double)
 %       * eTol      : zero epsilon tolerance (double)
 %       * Nullity   : false (default) to not calculate elementary matrix
@@ -87,7 +89,25 @@ bioIDX   = p.Results.biomassIndex;
 ExRxns   = p.Results.Exchanges;
 Modality = p.Results.Modality;
 
-spy(S)
+% Proper exchanges extraction ---
+switch class(ExRxns)
+    case 'logical' % default
+        ExRxnIDs = extractExchanges(model);
+    case 'cell'
+        ExRxnIDs = findRxnIDs(model, ExRxns);
+    case 'double'
+        ExRxnIDs = ExRxns;
+end
+
+% Finding Biomass reaction ---
+if bioIDX == 0
+    bioIDX = find(contains(model.rxnNames, 'biomass','IgnoreCase',true));
+    bioIDX = bioIDX(1);
+end
+
+disp(ExRxnIDs)
+disp()
+
 end
 
 
@@ -111,4 +131,37 @@ else
         end
     end
 end
+end
+
+% Subroutine to detect exchange reactions
+function ExRxnIDs = extractExchanges(model)
+%Beta version 
+
+% Option 1
+ExRxns = findExcRxns(model);
+ExRxnIDs = findRxnIDs(model, model.rxns(ExRxns));
+
+% % Option 2
+% S = model.S;
+% ExRxnIDs = find((sum(S == 0)==(n_row-1) & sum(S == -1) == 1)); %Extract position of exchanges
+% 
+% % Option 3
+% ExRxnIDs = find(contains(model.rxns, 'EX_'));
+end
+
+% Subroutine to calculate Elementary Matrix with the exchange reactions
+function [ME, EMCons] = buildElementaryMatrixCons(model, ExRxnsIDs)
+S = full(model.S);
+
+%ExRxns = model.rxns(ExRxnsIDs);
+Emets = findMetsFromRxns(model, model.rxns(ExRxnsIDs));
+[ME, elem] = computeElementalMatrix(model, Emets);
+disp("The elementary matrix was calculated for the following elements:")
+disp(elem) %
+EMCons = zeros(length(elem),length(model.rxns)); %
+EmetsIDs = findMetIDs(model, Emets);
+ME_t = ME';
+%Aqui falta un chequeo de que EX_rxns:EmetsIDs = 1:1
+ME_rearr = ME_t(:,(1:length(Emets))*logical(S(EmetsIDs, ExRxnIDs)));  %reordena la matriz elemental
+EMCons(:,ExRxnIDs) = ME_rearr;
 end
