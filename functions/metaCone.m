@@ -54,7 +54,7 @@ default_Modality    = 'fast';
 
 % Check Functions ---
 isvTolOk            = @(vTol) and(vTol < .5, vTol > 0);
-isAlphaOk           = @(a) and(isnumeric(a), a >= 0 | a <= 1);
+isAlphaOk           = @(a) and(isnumeric(a), a >= 0 & a <= 1);
 isNullityvalid      = @(nullity) ismember(nullity,[true, false]);
 isbioIDXvalid       = @(bioIDX) class(bioIDX) == "double";
 isExchsvalid        = @(exchs) or(iscellstr(exchs),isnumeric(exchs));
@@ -122,15 +122,42 @@ else % default
     nullity = NaN;
 end
 
-disp(ExRxnIDs)
-disp(bioIDX)
-disp(nullity)
-
+% Variables Initialization ---
+noexch   = length(ExRxnIDs);
+% epsilon  = [];
+% P_N      = 0; % Initial value of Projection matrix
+FBA_init = optimizeCbModel(changeObjective(model, model.rxns(bioIDX)));
+% FBA_init.f
+% minBasis = []; % Solutions will be located as columns of this matrix
+minBasis = FBA_init.x(ExRxnIDs); % Solutions will be located as columns of this matrix
+P_N      = orth(minBasis)';
+maxg = Alpha*FBA_init.f; % minimum growth per conversion
+if Modality == "fast"
+    % w = randn(noexch,1);
+    w = randi(1e5, [1,noexch]) + rand(1,noexch); 
+    % w = 1 + rand(1, noexch);
 end
 
 
+% disp(ExRxnIDs)
+% disp(bioIDX)
+% disp(nullity)
+% disp(FBA_init)
+disp(table(model.rxns(ExRxnIDs), minBasis))
+disp(P_N)
+disp(P_N*P_N')
+fprintf('minimum growth: %i\n', maxg)
+fprintf('Nº of exchages: %i\n', noexch)
+disp(w)
+
+CC = ExRxnIDs;
+Output = bioIDX;
+
+end
+
+%==========================================================================
 %% COMPLEMENTARY SUBROUTINES
-% Subroutine to check if 'model' arg has proper fields
+% Subroutine to check if 'model' arg has proper fields ====================
 function output = isCobraModel(model) 
 if ~isstruct(model)
     output = false;
@@ -151,7 +178,7 @@ else
 end
 end
 
-% Subroutine to detect exchange reactions
+% Subroutine to detect exchange reactions =================================
 function ExRxnIDs = extractExchanges(model)
 %Beta version 
 
@@ -167,7 +194,7 @@ ExRxnIDs = findRxnIDs(model, model.rxns(ExRxns));
 % ExRxnIDs = find(contains(model.rxns, 'EX_'));
 end
 
-% Subroutine to calculate Elementary Matrix with the exchange reactions
+% Subroutine to calculate Elementary Matrix with the exchange reactions ===
 function [ME, EMCons] = buildElementaryMatrixCons(model, ExRxnsIDs)
 S = full(model.S);
 
