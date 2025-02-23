@@ -151,7 +151,7 @@ fprintf('Nº of exchages: %i\n', noexch)
 disp(w)
 
 CC = ExRxnIDs;
-Output = bioIDX;
+Output = w;
 
 end
 
