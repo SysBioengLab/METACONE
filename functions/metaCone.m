@@ -9,6 +9,10 @@ function [CC, Output] = metaCone(model, varargin)
 % estimated nullity of the 'exchange' elementary matrix, the exhange
 % reactions, and the elementary matrix itself.
 % Optional inputs should be fed to the function as key-value pairs.
+%
+% The 'fast'modality
+% The 'full' modality performs 2J LP problems per iteration.
+%
 % The function will detect the exchange reactions, if not provided. 
 % The function will select the first biomass rxn found, if not provided.
 %
@@ -132,6 +136,8 @@ if Modality == "fast"
     % w = randn(noexch,1);
     w = randi(1e5, [1,noexch]) + rand(1,noexch); 
     % w = 1 + rand(1, noexch);
+else % 'full'
+    w = 1;
 end
 
 %% GREEDY LP ITERATIONS ====
@@ -158,29 +164,67 @@ while true
     k = k + 1;
     fprintf('Iteration: %i.\n', k);
     switch Modality
-        case 'full'
-        case 'fast'
+        case 'full' %------------------------------------------------------
+            jx      = noexch; % size(P_NT,1)
+            JMax    = zeros(size(S,2) + 1, jx);
+            JMin    = zeros(size(S,2) + 1, jx);
+            
+            parfor i = 1:jx
+                x   = P_NT(i,:); % Taking one row for each problem
+                
+                % We build both problems first
+                LP1 = buildLPgurobi(S,x,w,lb,ub,bioIDX,ExRxnIDs,maxg,'Max'); %max
+                LP2 = buildLPgurobi(S,x,w,lb,ub,bioIDX,ExRxnIDs,maxg,'Min'); %min
+                
+                % Solving 'max' problem first.
+                solMax = gurobi(LP1, params);
+                if strcmp(solMax.status,'OPTIMAL')
+                    LP2.vbasis   = solMax.vbasis;
+                    LP2.cbasis   = solMax.cbasis;
+                    JMax(:,i)    = solMax.x;
+                    EpsilonsK_max(i) = solMax.objval;
+                    allSols      = [allSols sparse(solMax.x(ExRxnIDs))];
+                end
+                %Solvin 'min' problem with a heads-up, if possible. 
+                solMin = gurobi(LP2, params);
+                if strcmp(solMin.status,'OPTIMAL')
+                    JMin(:,i)    = solMin.x;
+                    EpsilonsK_min(i) = solMin.objval;
+                    allSols      = [allSols sparse(solMin.x(ExRxnIDs))];
+                end
+            end
+            EpsilonsK = [EpsilonsK_max' EpsilonsK_min'];
+            Epsilons = [Epsilons EpsilonsK];
+            Useless = abs(EpsilonsK) < eTol;
+            EpsilonsK(Useless) = 0; % tolerance of Epsilon
+            if all(EpsilonsK==0)
+                break
+            end
+            J2 = [JMax, JMin];
+            J2 = J2(:,~Useless);
+        case 'fast' %------------------------------------------------------
     end
-    %minBasis = [minBasis, vopt]; 
+    [vopt, J2best] = VoptSelection(J2, ExRxnIDs, minBasis, vTol);
+    minBasis = [minBasis, vopt];
     P_N = orth(minBasis)';
     if k==nits
         break
     end
 end
 
-
 % disp(ExRxnIDs)
 % disp(bioIDX)
 % disp(nullity)
 % disp(FBA_init)
-disp(table(model.rxns(ExRxnIDs), minBasis))
-disp(P_N)
-fprintf('Is it a truly agood matrix?: %f \n',P_N*P_N')
-fprintf('minimum growth: %i\n', maxg)
+% disp(table(model.rxns(ExRxnIDs), minBasis))
+% disp(P_NT)
+% fprintf('Is it a truly agood matrix?: %f \n',P_N*P_N')
+% fprintf('minimum growth: %i\n', maxg)
 fprintf('Nº of exchages: %i\n', noexch)
-disp(w)
+% disp([EpsilonsK_max, EpsilonsK_min])
+% disp(w)
 
-CC = ExRxnIDs;
+CC = minBasis;
 Output = w;
 
 end
@@ -239,4 +283,80 @@ ME_t = ME';
 %Aqui falta un chequeo de que EX_rxns:EmetsIDs = 1:1
 ME_rearr = ME_t(:,(1:length(Emets))*logical(S(EmetsIDs, ExRxnIDs)));  %reordena la matriz elemental
 EMCons(:,ExRxnIDs) = ME_rearr;
+end
+
+%% REQUIRED SUBROUTINES
+
+function LPproblem = buildLPgurobi(S,P_NT,w,lb,ub,bioIDX,ExRxnIDs,maxg,sense)
+% P_NT can be the entire matrix or just a row (x). 
+% The 'w' vector is '1' for the 'full' version.
+
+% Parameter initialization
+[m,n]                   = size(S);
+noexch                  = size(P_NT,1); % This should be '1' in the 'full'.
+% noexch      = numel(ExRxnIDs);
+% novar       = n + noexch; % No. of total variables
+nores                   = m + noexch; % No. of constraints
+lb(bioIDX)              = maxg; % Min growth forced
+
+% Build the appropriate LP structure (minimal and maximal)
+% Objective Function
+% w_1*ep_1 + w_2*ep_2 +  ... + w_n*ep_n
+LPproblem.obj           = [zeros(n,1); w.*ones(noexch,1)]; %Epsilons 
+LPproblem.modelsense    = sense;
+
+% Restrictions/Constraints
+Proj                    = zeros(noexch, n);
+Proj(:,ExRxnIDs)        = P_NT;
+LPproblem.A             = sparse([S,     zeros(m,noexch);... % S·v = 0
+                                  Proj, -eye(noexch)]);    % P·v ~= 0
+LPproblem.lb            = [lb; -1e5*ones(noexch,1)]; % fluxes and epsilons
+LPproblem.ub            = [ub;  1e5*ones(noexch,1)];
+
+% Defining constraints sense
+LPproblem.sense         = [repelem('=',m,1);... 
+                           repelem('=',noexch,1)];
+
+% Right-hand vector formulation
+LPproblem.rhs           = zeros(nores,1);
+
+%Extra parameters
+end
+
+
+% Subroutine to select among possible solutions for the k-th iteration
+function [vopt, best] = VoptSelection(J2, ExRxnIDs, minBasis, vTol)
+%We select which 
+%fs = sum(any(J2)); %number of solutions found
+fs = size(J2,2); % max n1 of posiblesolutions
+vopt = J2(ExRxnIDs,:);
+vopt(abs(vopt) < vTol) = 0;
+if sum(any(J2))==1
+    % If we only found one solution, we keep it.
+    vopt = vopt(:,any(J2));
+    best = J2(:,any(J2));
+else
+    % %we can try to implement this, to make it faster
+%     if rank(vopt) == fs
+%         % We also keep these solutions
+%     else
+%         if isempty(minBasis)
+%             [~, I] = max(sum(vopt==0));
+%             vopt = vopt(:,I);
+%         else
+%         end
+%     end   
+    c1 = mean(minBasis,2); %centroid
+    cosSin = nan(fs,1);
+    for i = 1:fs
+        if ~any(J2(:,i))
+            continue % we skip if there was no solution at i
+        end
+        vi = vopt(:,i);
+        cosSin(i) = dot(vi,c1)/(norm(vi)*norm(c1)); %cosine similarity
+    end
+    [~, wI] = min(cosSin);
+    vopt = vopt(:,wI);
+    best = J2(:,wI);
+end
 end
