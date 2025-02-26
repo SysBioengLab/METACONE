@@ -124,18 +124,48 @@ end
 
 % Variables Initialization ---
 noexch   = length(ExRxnIDs);
-% epsilon  = [];
-% P_N      = 0; % Initial value of Projection matrix
 FBA_init = optimizeCbModel(changeObjective(model, model.rxns(bioIDX)));
-% FBA_init.f
-% minBasis = []; % Solutions will be located as columns of this matrix
 minBasis = FBA_init.x(ExRxnIDs); % Solutions will be located as columns of this matrix
-P_N      = orth(minBasis)';
+P_N      = orth(minBasis)'; % Initial value of Projection matrix
 maxg = Alpha*FBA_init.f; % minimum growth per conversion
 if Modality == "fast"
     % w = randn(noexch,1);
     w = randi(1e5, [1,noexch]) + rand(1,noexch); 
     % w = 1 + rand(1, noexch);
+end
+
+%% GREEDY LP ITERATIONS ====
+fprintf('Starting %s modality of the algorithm: \n', Modality)
+fprintf('Minimum growth per conversion set to %f: \n', maxg)
+k = 0;
+
+% Complementary Performance
+nits = 29;
+Epsilons = [];
+allSols = [];
+solspK = zeros(nits,1);
+params.OutputFlag  = 0;
+params.LPWarmStart = 1;
+
+tic
+while true
+    % Projection Matrix update.
+    P_NT = eye(noexch) - P_N'*P_N;
+    
+    EpsilonsK_max = zeros(noexch,1); %we will keep the epsilons
+    EpsilonsK_min = zeros(noexch,1);
+    
+    k = k + 1;
+    fprintf('Iteration: %i.\n', k);
+    switch Modality
+        case 'full'
+        case 'fast'
+    end
+    %minBasis = [minBasis, vopt]; 
+    P_N = orth(minBasis)';
+    if k==nits
+        break
+    end
 end
 
 
@@ -145,7 +175,7 @@ end
 % disp(FBA_init)
 disp(table(model.rxns(ExRxnIDs), minBasis))
 disp(P_N)
-disp(P_N*P_N')
+fprintf('Is it a truly agood matrix?: %f \n',P_N*P_N')
 fprintf('minimum growth: %i\n', maxg)
 fprintf('Nº of exchages: %i\n', noexch)
 disp(w)
