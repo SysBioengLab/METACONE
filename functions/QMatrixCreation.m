@@ -1,33 +1,31 @@
-function [Q, Output] = QMatrixCreation(Models, CCs, Rs)
+function [Q, Output] = QMatrixCreation(NamesAbb, CCs, Rs)
 %% 
 % The function calcaluates a stoichiometric matrix (Q-Matrix) based on the
 % conversions in 'CCs', in turn calculated by the metaCone() function. The
-% Q variable will be an M x 
+% Q variable will be an M x R Matrix, with M being the cardinality of the 
+% union of all exchangeable metabolites of each model, and R is the sum of
+% the dimensons of each C_ext basis. 
+% Given each C_ext (output of metaCone() function), this function will
+% paste column-wise the conversion, while smartly ordering the rows of the
+% final matrix, so that the metabolites are alphabetically sorted.
+%
 %
 % USAGE:
 %
-%   [CC, output] = setCCon3_parfor(model)
+%   [Q, Output] = QMatrixCreation(Models, CCs, Rs)
 %
 % INPUTS:
 %
-%   model           : COBRA model (structure) with the following required fields:
+%   NamesAbb        : Cell array of COBRA models, each with the fields:
 %       * S         : m x n Stoichiometric Matrix
 %       * c         : n x 1 linear objective coefficients
 %       * lb        : n x 1 lower bounds on flux vector (the variables)
 %       * ub        : n x 1 upper bounds on flux vector
-%
-% OPTIONAL INPUTS:
-%
-%       * Alpha     : a double between 0 and 1. 
-%       * Modality  : 'full' or 'fast'
-%       * biomassIndex  : biomass flux exchange index (integer)
-%       * Exchanges : array (vector) with the exchanges (indices) of the model
-%       * vTol      : zero flux tolerance (double)
-%       * eTol      : zero epsilon tolerance (double)
-%       * Nullity   : false (default) to not calculate elementary matrix
+%   CCs             : Cell array of 
 %
 % OUTPUTS:
 %
+%       * Q         : The Q-Matrix.
 %       * Output    : A structure with the following fields:
 %==========================================================================
 %% PARSING INPUTS ===
@@ -273,159 +271,8 @@ runtime            = toc;
 
 %% OUTPUT ===
 
-% C_ext
-CC = minBasis;
 
 % Additional information
 Output.runtime   = runtime;
-Output.iters     = k;
-Output.noexch    = noexch;
-Output.noconv    = size(minBasis, 2);
-Output.nullity   = nullity;
-Output.mingrowth = maxg;
-% Output.biomass   = bioIDX;
-Output.exchanges = table((1:size(minBasis,1))', model.rxns(ExRxnIDs),'VariableNames',{'No.','RxnName'});
-if Nullity
-    Output.elemMat   = {ME, EMCons};
-end
-if Modality == "fast"
-    Output.w         = w;
-end
-if keepAll
-    Output.Epsilons  = Epsilons;
-    Output.Allsol    = allSols;
-end
 
 end % of MetaCone function
-
-%==========================================================================
-%% COMPLEMENTARY SUBROUTINES
-% Subroutine to check if 'model' arg has proper fields ====================
-function output = isCobraModel(model) 
-if ~isstruct(model)
-    output = false;
-else
-    if ~and(isfield(model,'S'), isnumeric(model.S))
-        output = false; 
-    else
-        if and(isfield(model,'lb'),isfield(model,'ub'))
-            if and(isnumeric(model.lb), isnumeric(model.ub))
-                if and(isfield(model, 'c'), isnumeric(model.c))
-                    output = true;
-                end
-            end
-        else
-            output = false;
-        end
-    end
-end
-end
-
-% Subroutine to detect exchange reactions =================================
-function ExRxnIDs = extractExchanges(model)
-%Beta version 
-
-% Option 1
-ExRxns = findExcRxns(model);
-ExRxnIDs = findRxnIDs(model, model.rxns(ExRxns));
-
-% % Option 2
-% S = model.S;
-% ExRxnIDs = find((sum(S == 0)==(n_row-1) & sum(S == -1) == 1)); %Extract position of exchanges
-% 
-% % Option 3
-% ExRxnIDs = find(contains(model.rxns, 'EX_'));
-end
-
-% Subroutine to calculate Elementary Matrix with the exchange reactions ===
-function [ME, EMCons] = buildElementaryMatrixCons(model, ExRxnsIDs)
-S = full(model.S);
-
-%ExRxns = model.rxns(ExRxnsIDs);
-Emets = findMetsFromRxns(model, model.rxns(ExRxnsIDs));
-[ME, elem] = computeElementalMatrix(model, Emets);
-disp("The elementary matrix was calculated for the following elements:")
-disp(elem) %
-EMCons = zeros(length(elem),length(model.rxns)); %
-EmetsIDs = findMetIDs(model, Emets);
-ME_t = ME';
-%Aqui falta un chequeo de que EX_rxns:EmetsIDs = 1:1
-ME_rearr = ME_t(:,(1:length(Emets))*logical(S(EmetsIDs, ExRxnIDs)));  %reordena la matriz elemental
-EMCons(:,ExRxnIDs) = ME_rearr;
-end
-
-%% REQUIRED SUBROUTINES
-
-function LPproblem = buildLPgurobi(S,P_NT,w,lb,ub,bioIDX,ExRxnIDs,maxg,sense)
-% P_NT can be the entire matrix or just a row (x). 
-% The 'w' vector is '[1]' for the 'full' version.
-
-% Parameter initialization
-[m,n]                   = size(S);
-noexch                  = size(P_NT,1); % This should be '1' in the 'full'.
-% noexch      = numel(ExRxnIDs);
-% novar       = n + noexch; % No. of total variables
-nores                   = m + noexch; % No. of constraints
-lb(bioIDX)              = maxg; % Min growth forced
-
-% Build the appropriate LP structure (minimal and maximal)
-% Objective Function
-% w_1*ep_1 + w_2*ep_2 +  ... + w_n*ep_n
-LPproblem.obj           = [zeros(n,1); w.*ones(noexch,1)]; %Epsilons 
-LPproblem.modelsense    = sense;
-
-% Restrictions/Constraints
-Proj                    = zeros(noexch, n);
-Proj(:,ExRxnIDs)        = P_NT;
-LPproblem.A             = sparse([S,     zeros(m,noexch);... % S·v = 0
-                                  Proj, -eye(noexch)]);    % P·v ~= 0
-LPproblem.lb            = [lb; -1e5*ones(noexch,1)]; % fluxes and epsilons
-LPproblem.ub            = [ub;  1e5*ones(noexch,1)];
-
-% Defining constraints sense
-LPproblem.sense         = [repelem('=',m,1);... 
-                           repelem('=',noexch,1)];
-
-% Right-hand vector formulation
-LPproblem.rhs           = zeros(nores,1);
-
-%Extra parameters
-end
-
-
-% Subroutine to select among possible solutions for the k-th iteration
-function [vopt, best] = VoptSelection(J2, ExRxnIDs, minBasis, vTol)
-%We select which 
-%fs = sum(any(J2)); %number of solutions found
-fs = size(J2,2); % max n1 of posiblesolutions
-vopt = J2(ExRxnIDs,:);
-vopt(abs(vopt) < vTol) = 0;
-if sum(any(J2))==1
-    % If we only found one solution, we keep it.
-    vopt = vopt(:,any(J2));
-    best = J2(:,any(J2));
-else
-    % %we can try to implement this, to make it faster
-%     if rank(vopt) == fs
-%         % We also keep these solutions
-%     else
-%         if isempty(minBasis)
-%             [~, I] = max(sum(vopt==0));
-%             vopt = vopt(:,I);
-%         else
-%         end
-%     end   
-    c1 = mean(minBasis,2); %centroid
-    cosSin = nan(fs,1);
-    for i = 1:fs
-        if ~any(J2(:,i))
-            continue % we skip if there was no solution at i
-        end
-        vi = vopt(:,i);
-        cosSin(i) = dot(vi,c1)/(norm(vi)*norm(c1)); %cosine similarity
-    end
-    [~, wI] = min(cosSin);
-    vopt = vopt(:,wI);
-    best = J2(:,wI);
-end
-end
