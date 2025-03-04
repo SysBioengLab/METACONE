@@ -127,17 +127,17 @@ else % default
 end
 
 % Variables Initialization ---
-noexch   = length(ExRxnIDs);
-FBA_init = optimizeCbModel(changeObjective(model, model.rxns(bioIDX)));
-minBasis = FBA_init.x(ExRxnIDs); % Solutions will be located as columns of this matrix
-P_N      = orth(minBasis)'; % Initial value of Projection matrix
-maxg = Alpha*FBA_init.f; % minimum growth per conversion
+noexch              = length(ExRxnIDs);
+FBA_init            = optimizeCbModel(changeObjective(model, model.rxns(bioIDX)));
+minBasis            = FBA_init.x(ExRxnIDs); % final solutions
+P_N                 = orth(minBasis)'; % Initial value of Projection matrix
+maxg                = Alpha*FBA_init.f; % minimum growth per conversion
 if Modality == "fast"
     % w = randn(noexch,1);
-    w = randi(1e5, [1,noexch]) + rand(1,noexch); 
+    w               = randi(1e5, [1,noexch]) + rand(1,noexch); 
     % w = 1 + rand(1, noexch);
 else % 'full'
-    w = 1;
+    w               = 1;
 end
 
 %% GREEDY LP ITERATIONS ====
@@ -146,12 +146,11 @@ fprintf('Minimum growth per conversion set to %f: \n', maxg)
 k = 0;
 
 % Complementary Performance
-nits = 29;
-Epsilons = [];
-allSols = [];
-solspK = zeros(nits,1);
-params.OutputFlag  = 0;
-params.LPWarmStart = 1;
+nits                = 29;
+Epsilons            = [];
+allSols             = [];
+params.OutputFlag   = 0;
+params.LPWarmStart  = 1;
 
 tic
 while true
@@ -193,16 +192,68 @@ while true
                     allSols      = [allSols sparse(solMin.x(ExRxnIDs))];
                 end
             end
+            
+            % We keep all the epsilons
             EpsilonsK = [EpsilonsK_max' EpsilonsK_min'];
             Epsilons = [Epsilons EpsilonsK];
             Useless = abs(EpsilonsK) < eTol;
             EpsilonsK(Useless) = 0; % tolerance of Epsilon
+            
+            % TERMINATION .................
             if all(EpsilonsK==0)
+                break
+            elseif k == noexch
                 break
             end
             J2 = [JMax, JMin];
             J2 = J2(:,~Useless);
         case 'fast' %------------------------------------------------------
+            % Aux. var. for preaallocation. 
+            J2 = zeros(size(S,2) + noexch,2);
+            
+            % Building both problems with the complete P_NT
+            LP1 = buildLPgurobi(S,P_NT,w',lb,ub,bioIDX,ExRxnIDs,maxg,'Max'); %max
+            LP2 = buildLPgurobi(S,P_NT,w',lb,ub,bioIDX,ExRxnIDs,maxg,'Min'); %min
+            
+            % Annotating epsilon indices.
+            eps_ids = (size(S,2)+1):size(LP1.A,2);
+            
+            % Solving the 'max' problem
+            solMax = gurobi(LP1, params);
+            if strcmp(solMax.status,'OPTIMAL')
+                LP2.vbasis   = solMax.vbasis;
+                LP2.cbasis   = solMax.cbasis;
+                J2(:,1)      = solMax.x;
+                EpsilonsK_max(:,1) = solMax.x(eps_ids);
+                allSols = [allSols sparse(solMax.x(ExRxnIDs))];
+                Epsilons = [Epsilons sparse(solMax.x(eps_ids))];
+            end
+            % Solving the 'min' problem with warm-up
+            solMin = gurobi(LP2, params);
+            if strcmp(solMin.status,'OPTIMAL')
+                J2(:,2)      = solMin.x;
+                EpsilonsK_min(:,1) = solMin.x(eps_ids);
+                allSols = [allSols sparse(solMin.x(ExRxnIDs))];
+                Epsilons = [Epsilons sparse(solMax.x(eps_ids))];
+            end
+            
+            % We retain all the epsilons
+            EpsilonsK = [EpsilonsK_max EpsilonsK_min];
+            EpsilonsK(abs(EpsilonsK) < eTol) = 0; % tolerance of Epsilon
+            
+            Useless = ~any(EpsilonsK); %which LP gave null epsilsons?
+            
+            % TERMINATION .................
+            if all(EpsilonsK==0)
+                disp("All Epsilons are too small")
+                break
+            elseif k == noexch
+                break
+            end
+            
+            % We filter out the nullepsilons LPs.
+            J2 = J2(:,~Useless); % we filter out the null epsilons
+            
     end
     [vopt, J2best] = VoptSelection(J2, ExRxnIDs, minBasis, vTol);
     minBasis = [minBasis, vopt];
@@ -220,7 +271,7 @@ end
 % disp(P_NT)
 % fprintf('Is it a truly agood matrix?: %f \n',P_N*P_N')
 % fprintf('minimum growth: %i\n', maxg)
-fprintf('Nº of exchages: %i\n', noexch)
+% fprintf('Nº of exchanges: %i\n', noexch)
 % disp([EpsilonsK_max, EpsilonsK_min])
 % disp(w)
 
@@ -289,7 +340,7 @@ end
 
 function LPproblem = buildLPgurobi(S,P_NT,w,lb,ub,bioIDX,ExRxnIDs,maxg,sense)
 % P_NT can be the entire matrix or just a row (x). 
-% The 'w' vector is '1' for the 'full' version.
+% The 'w' vector is '[1]' for the 'full' version.
 
 % Parameter initialization
 [m,n]                   = size(S);
