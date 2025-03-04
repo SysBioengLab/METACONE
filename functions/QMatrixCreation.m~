@@ -1,28 +1,15 @@
-function [CC, Output] = metaCone(model, varargin)
+function [Q, allExcs] = QMatrixCreation(CCs, ress, NamesAbb)
 %% 
-%MetaCon is a greedy LP-optimization based algorithm that aims to capture
-% the metabolic potential of a COBRA model via basis calculation of a
-% 'growing' Conversion Cone (CC); every conversion has a non-zero growth rate.
-% The output is an MxN matrix, with M exchange reactions and N conversion
-% vectors.
-% The algorithm will keep track of the runtime, the rank of the matrix, the
-% estimated nullity of the 'exchange' elementary matrix, the exhange
-% reactions, and the elementary matrix itself.
-% Optional inputs should be fed to the function as key-value pairs.
-%
-% The 'fast'modality
-% The 'full' modality performs 2J LP problems per iteration.
-%
-% The function will detect the exchange reactions, if not provided. 
-% The function will select the first biomass rxn found, if not provided.
+% The function builds a Community Stoichiometric Matrix (Q-Matrix) based on
+% the conversions found for each COBRA model listed in **NamesAbb**
 %
 % USAGE:
 %
-%   [CC, output] = setCCon3_parfor(model)
+%   [Q, allExcs] = QMatrixCreation(CCs, ress, NamesAbb)
 %
 % INPUTS:
 %
-%   model           : COBRA model (structure) with the following required fields:
+%   models          : Cell array of COBRA models, each with the fields:
 %       * S         : m x n Stoichiometric Matrix
 %       * c         : n x 1 linear objective coefficients
 %       * lb        : n x 1 lower bounds on flux vector (the variables)
@@ -30,17 +17,10 @@ function [CC, Output] = metaCone(model, varargin)
 %
 % OPTIONAL INPUTS:
 %
-%       * Alpha     : a double between 0 and 1. 
-%       * Modality  : 'full' or 'fast'
-%       * biomassIndex  : biomass flux exchange index (integer)
-%       * Exchanges : array (vector) with the exchanges (indices) of the model
-%       * vTol      : zero flux tolerance (double)
-%       * eTol      : zero epsilon tolerance (double)
-%       * Nullity   : false (default) to not calculate elementary matrix
+%       * Alpha     : 
 %
 % OUTPUTS:
 %
-%       * CC        :
 %       * Output    : A structure with the following fields:
 %==========================================================================
 %% PARSING INPUTS ===
