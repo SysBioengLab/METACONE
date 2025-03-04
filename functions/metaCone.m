@@ -55,6 +55,7 @@ default_Nullity     = false;
 default_bioIDX      = 0;
 default_Exchanges   = true;
 default_Modality    = 'fast';
+default_keepAll     = false;
 
 % Check Functions ---
 isvTolOk            = @(vTol) and(vTol < .5, vTol > 0);
@@ -63,6 +64,7 @@ isNullityvalid      = @(nullity) ismember(nullity,[true, false]);
 isbioIDXvalid       = @(bioIDX) class(bioIDX) == "double";
 isExchsvalid        = @(exchs) or(iscellstr(exchs),isnumeric(exchs));
 isModalityvalid     = @(mod) ismember(mod, {'full','fast'});
+isBool              = @(b) or(class(b)=='logical',ismember(b, [0 1]));
 %isCobraModel as a subroutine
 
 % Parameters ---
@@ -74,13 +76,15 @@ addParameter(p, 'Alpha'     , default_Alpha,     isAlphaOk);
 addParameter(p, 'Nullity'   , default_Nullity,   isNullityvalid);
 addParameter(p, 'biomassIndex', default_bioIDX,  isbioIDXvalid);
 addParameter(p, 'Modality'  , default_Modality,  isModalityvalid);
+addParameter(p, 'keepAll'   , default_keepAll,   isBool);
 
 parse(p, model, varargin{:})
 
+fprintf('Call: \n')
 disp(p.Results)
 
 %% INITIALIZATION ===
-%
+
 
 % Arguments Extraction and Initialization
 S        = full(p.Results.model.S);
@@ -93,6 +97,7 @@ Nullity  = p.Results.Nullity;
 bioIDX   = p.Results.biomassIndex;
 ExRxns   = p.Results.Exchanges;
 Modality = p.Results.Modality;
+keepAll  = p.Results.keepAll;
 
 % Proper exchanges extraction ---
 switch class(ExRxns)
@@ -184,14 +189,18 @@ while true
                     LP2.cbasis       = solMax.cbasis;
                     JMax(:,i)        = solMax.x;
                     EpsilonsK_max(i) = solMax.objval;
-                    allSols          = [allSols sparse(solMax.x(ExRxnIDs))];
+                    if keepAll %only saved if flagged
+                        allSols      = [allSols sparse(solMax.x(ExRxnIDs))];
+                    end
                 end
                 %Solvin 'min' problem with a heads-up, if possible. ---
                 solMin = gurobi(LP2, params);
                 if strcmp(solMin.status,'OPTIMAL')
                     JMin(:,i)        = solMin.x;
                     EpsilonsK_min(i) = solMin.objval;
-                    allSols          = [allSols sparse(solMin.x(ExRxnIDs))];
+                    if keepAll
+                        allSols      = [allSols sparse(solMin.x(ExRxnIDs))];
+                    end
                 end
             end
             
@@ -229,16 +238,21 @@ while true
                 LP2.cbasis         = solMax.cbasis;
                 J2(:,1)            = solMax.x;
                 EpsilonsK_max(:,1) = solMax.x(eps_ids);
-                allSols            = [allSols sparse(solMax.x(ExRxnIDs))];
-                Epsilons           = [Epsilons sparse(solMax.x(eps_ids))];
+                if keepAll
+                    allSols        = [allSols sparse(solMax.x(ExRxnIDs))];
+                    Epsilons       = [Epsilons sparse(solMax.x(eps_ids))];
+                end
             end
             % Solving the 'min' problem with warm-up ---
             solMin = gurobi(LP2, params);
             if strcmp(solMin.status,'OPTIMAL')
                 J2(:,2)            = solMin.x;
                 EpsilonsK_min(:,1) = solMin.x(eps_ids);
-                allSols            = [allSols sparse(solMin.x(ExRxnIDs))];
-                Epsilons           = [Epsilons sparse(solMax.x(eps_ids))];
+                if keepAll
+                    allSols        = [allSols sparse(solMin.x(ExRxnIDs))];
+                    Epsilons       = [Epsilons sparse(solMax.x(eps_ids))];
+                end
+                
             end
             
             % We retain all the epsilons ---
@@ -271,20 +285,30 @@ runtime            = toc;
 
 %% OUTPUT ===
 
-% disp(ExRxnIDs)
-% disp(bioIDX)
-% disp(nullity)
-% disp(FBA_init)
-% disp(table(model.rxns(ExRxnIDs), minBasis))
-% disp(P_NT)
-% fprintf('Is it a truly agood matrix?: %f \n',P_N*P_N')
-% fprintf('minimum growth: %i\n', maxg)
-% fprintf('Nº of exchanges: %i\n', noexch)
-% disp([EpsilonsK_max, EpsilonsK_min])
-% disp(w)
+% C_ext
+CC = minBasis;
 
-
+% Additional information
+Output.runtime   = runtime;
+Output.iters     = k;
+Output.noexch    = noexch;
+Output.noconv    = size(minBasis, 2);
+Output.nullity   = nullity;
+Output.mingrowth = maxg;
+% Output.biomass   = bioIDX;
+Output.exchanges = table((1:size(minBasis,1))', model.rxns(ExRxnIDs),'VariableNames',{'No.','RxnName'});
+if Nullity
+    Output.elemMat   = {ME, EMCons};
 end
+if Modality == "fast"
+    Output.w         = w;
+end
+if keepAll
+    Output.Epsilons  = Epsilons;
+    Output.Allsol    = allSols;
+end
+
+end % of MetaCone function
 
 %==========================================================================
 %% COMPLEMENTARY SUBROUTINES
