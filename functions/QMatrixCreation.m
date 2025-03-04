@@ -62,13 +62,11 @@ Rs       = p.Results.Rs;
 nums     = numel(NamesAbb);
 allExcs  = {}; 
 Q        = [];
-Kyes     = cell(1, nums);
+Keys     = cell(1, nums);
 
-%% MATRIX CONSTRUCTION ====
-
-% COMMON EXCHANGES SET and NORMALIZATION ----
+%% COMMON EXCHANGES SET and NORMALIZATION ====
 for i = 1:numel(CCs)
-    % Annotating current cc and exchanges ---
+    % Annotating current cc and exchanges ----
     cc = CCs{i};
     exchanges = Rs{i}.exchanges.RxnName;
     
@@ -76,7 +74,7 @@ for i = 1:numel(CCs)
     a = contains(exchanges, 'EX_biomass(e)');
     b = contains(exchanges, 'EX_biomass[e]');
     
-    % Extracting the biomass exchange reaction
+    % Extracting the biomass exchange reaction ----
     if any(a)
         
         % We tag each biommas reaction with the name abb.
@@ -100,7 +98,22 @@ for i = 1:numel(CCs)
     allExcs = union(allExcs, exchanges);
 end
 
-% KEYS FOR EACH SPECIES ----
+%% KEYS FOR EACH SPECIES ====
+for i = 1:nums
+    exchanges = Rs{i}.exchanges.RxnName;
+    tempInd   = ismember(allExcs, exchanges);
+    partexc   = allExcs(tempInd);
+    tempKey   = zeros(numel(exchanges),1);
+    if ~isempty(setdiff(partexc, exchanges))
+        error('FATAL error while ordering exchanges')
+    end
+
+    % For each member, we get the indices of their exchanges
+    for j = 1:numel(partexc)
+        tempKey(j) = find(contains(exchanges, partexc(j)));
+    end
+    Keys{i} = tempKey;
+end; clear i
 
 % Q-MATRIX REARRANGE ---- 
 
