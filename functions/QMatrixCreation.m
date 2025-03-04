@@ -1,12 +1,12 @@
 function [Q, Output] = QMatrixCreation(NamesAbb, CCs, Rs)
-%% 
+%% (Beta) Q-Matrix Creation Function
 % The function calcaluates a stoichiometric matrix (Q-Matrix) based on the
 % conversions in 'CCs', in turn calculated by the metaCone() function. The
 % Q variable will be an M x R Matrix, with M being the cardinality of the 
 % union of all exchangeable metabolites of each model, and R is the sum of
 % the dimensons of each C_ext basis. 
 % Given each C_ext (output of metaCone() function), this function will
-% paste column-wise the conversion, while smartly ordering the rows of the
+% paste column-wise the conversions, while smartly ordering the rows of the
 % final matrix, so that the metabolites are alphabetically sorted.
 %
 %
@@ -16,17 +16,16 @@ function [Q, Output] = QMatrixCreation(NamesAbb, CCs, Rs)
 %
 % INPUTS:
 %
-%   NamesAbb        : Cell array of COBRA models, each with the fields:
-%       * S         : m x n Stoichiometric Matrix
-%       * c         : n x 1 linear objective coefficients
-%       * lb        : n x 1 lower bounds on flux vector (the variables)
-%       * ub        : n x 1 upper bounds on flux vector
-%   CCs             : Cell array of 
+%   NamesAbb        : Cell array of COBRA models
+%   CCs             : Cell array of C_ext matrices delivered by metaCone().
+%   Rs              : Structure obtained from metaCone(). The original
+% models must contain a 'EX_biomass_(e)' reaction in model.rxns
 %
 % OUTPUTS:
 %
 %       * Q         : The Q-Matrix.
 %       * Output    : A structure with the following fields:
+
 %==========================================================================
 %% PARSING INPUTS ===
 %
@@ -54,23 +53,59 @@ parse(p, NamesAbb, CCs, Rs)
 
 
 % Arguments Extraction and Initialization
-% S        = full(p.Results.model.S);
-% lb       = p.Results.model.lb;
-% 
-% 
-% % Optional Calculation of the Elementary Matrix ---
-% 
+NamesAbb = p.Results.NamesAbb;
+CCs      = p.Results.CCs;
+Rs       = p.Results.Rs;
+
+
 % % Variables Initialization ---
-% noexch              = length(ExRxnIDs);
-% 
-% 
-% %% GREEDY LP ITERATIONS ====
-% 
-% 
-% %% OUTPUT ===
-% 
-% 
-% % Additional information
-% Output.runtime   = runtime;
+nums     = numel(NamesAbb);
+allExcs  = {}; 
+Q        = [];
+Kyes     = cell(1, nums);
+
+%% MATRIX CONSTRUCTION ====
+
+% COMMON EXCHANGES SET and NORMALIZATION ----
+for i = 1:numel(CCs)
+    % Annotating current cc and exchanges ---
+    cc = CCs{i};
+    exchanges = Rs{i}.exchanges.RxnName;
+    
+    % Templates for finding the biomass exchanges
+    a = contains(exchanges, 'EX_biomass(e)');
+    b = contains(exchanges, 'EX_biomass[e]');
+    
+    % Extracting the biomass exchange reaction
+    if any(a)
+        
+        % We tag each biommas reaction with the name abb.
+        exchanges(a) = insertAfter(exchanges(a),'mass',['_' NamesAbb{i}]);
+        
+        % We normalize by the flux value of the biomass reaction.
+        cc = cc./cc(a,:);
+        
+    elseif any(b)
+        exchanges(b) = insertAfter(exchanges(b),'mass',['_' NamesAbb{i}]);
+        cc = cc./cc(b,:);
+    else
+        % Termination ........
+        error('Some models have no biomass exchange reaction')
+    end
+    % Modifying variables
+    Rs{i}.exchanges.RxnName = exchanges; 
+    CCs{i} = cc; 
+    
+    % Creating the exchanges union set.
+    allExcs = union(allExcs, exchanges);
+end
+
+% KEYS FOR EACH SPECIES ----
+
+% Q-MATRIX REARRANGE ---- 
+
+%% OUTPUT ===
+
+Output.allExcs   = allExcs;
 
 end % of MetaCone function
