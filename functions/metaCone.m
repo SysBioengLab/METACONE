@@ -313,26 +313,6 @@ end % of MetaCone function
 
 %==========================================================================
 %% COMPLEMENTARY SUBROUTINES
-% Subroutine to check if 'model' arg has proper fields ====================
-function output = isCobraModel(model) 
-if ~isstruct(model)
-    output = false;
-else
-    if ~and(isfield(model,'S'), isnumeric(model.S))
-        output = false; 
-    else
-        if and(isfield(model,'lb'),isfield(model,'ub'))
-            if and(isnumeric(model.lb), isnumeric(model.ub))
-                if and(isfield(model, 'c'), isnumeric(model.c))
-                    output = true;
-                end
-            end
-        else
-            output = false;
-        end
-    end
-end
-end
 
 % Subroutine to detect exchange reactions =================================
 function ExRxnIDs = extractExchanges(model)
