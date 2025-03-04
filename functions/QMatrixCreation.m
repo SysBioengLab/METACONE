@@ -33,37 +33,44 @@ function [Q, Output] = QMatrixCreation(NamesAbb, CCs, Rs)
 p = inputParser;
 p.KeepUnmatched = false;
 
+
 % Default values ---
-default_vTol        = 1e-8; 
+
 
 % Check Functions ---
-isvTolOk            = @(vTol) and(vTol < .5, vTol > 0);
-isAlphaOk           = @(a) and(isnumeric(a), a >= 0 & a <= 1
+isNumericMatrix     = @(M) and(isnumeric(M), numel(M)>1);
+isCCsOk             = @(C) and(iscell(C), all(cellfun(isNumericMatrix,C)));
+
 
 % Parameters ---
-addRequired (p, 'model'     , @isCobraModel);
+addRequired(p, 'NamesAbb'  , @iscellstr);
+addRequired(p, 'CCs'       , isCCsOk);
+addRequired(p, 'Rs'        , @iscell);
+
+parse(p, NamesAbb, CCs, Rs)
+
 
 %% INITIALIZATION ===
 
 
 % Arguments Extraction and Initialization
-S        = full(p.Results.model.S);
-lb       = p.Results.model.lb;
-
-
-% Optional Calculation of the Elementary Matrix ---
-
-% Variables Initialization ---
-noexch              = length(ExRxnIDs);
-
-
-%% GREEDY LP ITERATIONS ====
-
-
-%% OUTPUT ===
-
-
-% Additional information
-Output.runtime   = runtime;
+% S        = full(p.Results.model.S);
+% lb       = p.Results.model.lb;
+% 
+% 
+% % Optional Calculation of the Elementary Matrix ---
+% 
+% % Variables Initialization ---
+% noexch              = length(ExRxnIDs);
+% 
+% 
+% %% GREEDY LP ITERATIONS ====
+% 
+% 
+% %% OUTPUT ===
+% 
+% 
+% % Additional information
+% Output.runtime   = runtime;
 
 end % of MetaCone function
