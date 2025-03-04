@@ -145,8 +145,7 @@ fprintf('Starting %s modality of the algorithm: \n', Modality)
 fprintf('Minimum growth per conversion set to %f: \n', maxg)
 k = 0;
 
-% Complementary Performance
-nits                = 29;
+% Complementary Performance ---
 Epsilons            = [];
 allSols             = [];
 params.OutputFlag   = 0;
@@ -154,14 +153,17 @@ params.LPWarmStart  = 1;
 
 tic
 while true
-    % Projection Matrix update.
+    % PROJECTION MATRIX UPDATE .................
     P_NT = eye(noexch) - P_N'*P_N;
     
-    EpsilonsK_max = zeros(noexch,1); %we will keep the epsilons
+    % Preallocation vars for termination conditions.
+    EpsilonsK_max = zeros(noexch,1);
     EpsilonsK_min = zeros(noexch,1);
-    
     k = k + 1;
+    
     fprintf('Iteration: %i.\n', k);
+    
+    % LP OPTIMIZATION .................
     switch Modality
         case 'full' %------------------------------------------------------
             jx      = noexch; % size(P_NT,1)
@@ -169,34 +171,36 @@ while true
             JMin    = zeros(size(S,2) + 1, jx);
             
             parfor i = 1:jx
-                x   = P_NT(i,:); % Taking one row for each problem
+                x   = P_NT(i,:); % taking one row for each problem
                 
-                % We build both problems first
+                % We build both problems first ---
                 LP1 = buildLPgurobi(S,x,w,lb,ub,bioIDX,ExRxnIDs,maxg,'Max'); %max
                 LP2 = buildLPgurobi(S,x,w,lb,ub,bioIDX,ExRxnIDs,maxg,'Min'); %min
                 
-                % Solving 'max' problem first.
+                % Solving 'max' problem first ---
                 solMax = gurobi(LP1, params);
                 if strcmp(solMax.status,'OPTIMAL')
-                    LP2.vbasis   = solMax.vbasis;
-                    LP2.cbasis   = solMax.cbasis;
-                    JMax(:,i)    = solMax.x;
+                    LP2.vbasis       = solMax.vbasis;
+                    LP2.cbasis       = solMax.cbasis;
+                    JMax(:,i)        = solMax.x;
                     EpsilonsK_max(i) = solMax.objval;
-                    allSols      = [allSols sparse(solMax.x(ExRxnIDs))];
+                    allSols          = [allSols sparse(solMax.x(ExRxnIDs))];
                 end
-                %Solvin 'min' problem with a heads-up, if possible. 
+                %Solvin 'min' problem with a heads-up, if possible. ---
                 solMin = gurobi(LP2, params);
                 if strcmp(solMin.status,'OPTIMAL')
-                    JMin(:,i)    = solMin.x;
+                    JMin(:,i)        = solMin.x;
                     EpsilonsK_min(i) = solMin.objval;
-                    allSols      = [allSols sparse(solMin.x(ExRxnIDs))];
+                    allSols          = [allSols sparse(solMin.x(ExRxnIDs))];
                 end
             end
             
-            % We keep all the epsilons
-            EpsilonsK = [EpsilonsK_max' EpsilonsK_min'];
-            Epsilons = [Epsilons EpsilonsK];
-            Useless = abs(EpsilonsK) < eTol;
+            % We keep all the epsilons ---
+            EpsilonsK          = [EpsilonsK_max' EpsilonsK_min'];
+            Epsilons           = [Epsilons EpsilonsK];
+            
+            % which rows gave null epsilons?
+            Useless            = abs(EpsilonsK) < eTol;
             EpsilonsK(Useless) = 0; % tolerance of Epsilon
             
             % TERMINATION .................
@@ -208,40 +212,41 @@ while true
             J2 = [JMax, JMin];
             J2 = J2(:,~Useless);
         case 'fast' %------------------------------------------------------
-            % Aux. var. for preaallocation. 
-            J2 = zeros(size(S,2) + noexch,2);
+            % Aux. var. for preaallocation. ---
+            J2      = zeros(size(S,2) + noexch,2);
             
-            % Building both problems with the complete P_NT
-            LP1 = buildLPgurobi(S,P_NT,w',lb,ub,bioIDX,ExRxnIDs,maxg,'Max'); %max
-            LP2 = buildLPgurobi(S,P_NT,w',lb,ub,bioIDX,ExRxnIDs,maxg,'Min'); %min
+            % Building both problems with the complete P_NT ---
+            LP1     = buildLPgurobi(S,P_NT,w',lb,ub,bioIDX,ExRxnIDs,maxg,'Max'); %max
+            LP2     = buildLPgurobi(S,P_NT,w',lb,ub,bioIDX,ExRxnIDs,maxg,'Min'); %min
             
-            % Annotating epsilon indices.
+            % Annotating epsilon indices.---
             eps_ids = (size(S,2)+1):size(LP1.A,2);
             
-            % Solving the 'max' problem
-            solMax = gurobi(LP1, params);
+            % Solving the 'max' problem ---
+            solMax  = gurobi(LP1, params);
             if strcmp(solMax.status,'OPTIMAL')
-                LP2.vbasis   = solMax.vbasis;
-                LP2.cbasis   = solMax.cbasis;
-                J2(:,1)      = solMax.x;
+                LP2.vbasis         = solMax.vbasis;
+                LP2.cbasis         = solMax.cbasis;
+                J2(:,1)            = solMax.x;
                 EpsilonsK_max(:,1) = solMax.x(eps_ids);
-                allSols = [allSols sparse(solMax.x(ExRxnIDs))];
-                Epsilons = [Epsilons sparse(solMax.x(eps_ids))];
+                allSols            = [allSols sparse(solMax.x(ExRxnIDs))];
+                Epsilons           = [Epsilons sparse(solMax.x(eps_ids))];
             end
-            % Solving the 'min' problem with warm-up
+            % Solving the 'min' problem with warm-up ---
             solMin = gurobi(LP2, params);
             if strcmp(solMin.status,'OPTIMAL')
-                J2(:,2)      = solMin.x;
+                J2(:,2)            = solMin.x;
                 EpsilonsK_min(:,1) = solMin.x(eps_ids);
-                allSols = [allSols sparse(solMin.x(ExRxnIDs))];
-                Epsilons = [Epsilons sparse(solMax.x(eps_ids))];
+                allSols            = [allSols sparse(solMin.x(ExRxnIDs))];
+                Epsilons           = [Epsilons sparse(solMax.x(eps_ids))];
             end
             
-            % We retain all the epsilons
-            EpsilonsK = [EpsilonsK_max EpsilonsK_min];
+            % We retain all the epsilons ---
+            EpsilonsK              = [EpsilonsK_max EpsilonsK_min];
             EpsilonsK(abs(EpsilonsK) < eTol) = 0; % tolerance of Epsilon
             
-            Useless = ~any(EpsilonsK); %which LP gave null epsilsons?
+            % which LP gave null epsilsons? ---
+            Useless                = ~any(EpsilonsK); 
             
             % TERMINATION .................
             if all(EpsilonsK==0)
@@ -251,17 +256,20 @@ while true
                 break
             end
             
-            % We filter out the nullepsilons LPs.
-            J2 = J2(:,~Useless); % we filter out the null epsilons
-            
+            % We filter out the nullepsilons LPs. ---
+            J2 = J2(:,~Useless);
+            %--------------------------------------------------------------
     end
+    % Selecting and saving the best solution of the iteration. ---
     [vopt, J2best] = VoptSelection(J2, ExRxnIDs, minBasis, vTol);
-    minBasis = [minBasis, vopt];
-    P_N = orth(minBasis)';
-    if k==nits
-        break
-    end
+    minBasis       = [minBasis, vopt];
+    
+    % PROJECTION MATRIX UPDATE .................
+    P_N            = orth(minBasis)';
 end
+runtime            = toc;
+
+%% OUTPUT ===
 
 % disp(ExRxnIDs)
 % disp(bioIDX)
@@ -275,8 +283,6 @@ end
 % disp([EpsilonsK_max, EpsilonsK_min])
 % disp(w)
 
-CC = minBasis;
-Output = w;
 
 end
 
