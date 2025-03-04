@@ -115,10 +115,25 @@ for i = 1:nums
     Keys{i} = tempKey;
 end; clear i
 
-% Q-MATRIX REARRANGE ---- 
+%% Q-MATRIX REARRANGE ====
+
+% The Conversions are glued and the rows rearrenged according to the keys.
+for i = 1:nums
+    exchanges = Rs{i}.exchanges.RxnName;
+    tempInd   = ismember(allExcs, exchanges);
+    Qtemp = sparse(zeros(size(allExcs,1), Rs{i}.noconv));
+    conversions = CCs{i};
+    Qtemp(tempInd,:) = conversions(Keys{i},:);
+    Q = [Q, Qtemp];
+end
+
+% Adding the community exchanges
+[m, ~] = size(Q);
+Q = [Q, -eye(m)];
 
 %% OUTPUT ===
 
 Output.allExcs   = allExcs;
+Output.Keys      = Keys;
 
-end % of MetaCone function
+end % of main function
