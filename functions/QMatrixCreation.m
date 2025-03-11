@@ -128,6 +128,8 @@ for i = 1:nums
 end
 
 % Adding the community exchanges
+% "easy approach": each metabolite has a secreting echange reaction of the
+% form: 'met_(e) -> '
 [m, ~] = size(Q);
 Q = [Q, -eye(m)];
 
