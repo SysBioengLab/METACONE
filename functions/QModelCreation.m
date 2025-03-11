@@ -18,28 +18,31 @@ function QModel = QModelCreation(models, Names, varargin)
 %
 % INPUTS:
 %
-%   models          : An array of COBRA models with the required fields:
-%       * S         : m x n Stoichiometric Matrix
-%       * c         : n x 1 linear objective coefficients
-%       * lb        : n x 1 lower bounds on flux vector (the variables)
-%       * ub        : n x 1 upper bounds on flux vector
-%   Names           : A cell array with the names of the models.
+%   models       : A (q,1) array of COBRA models with the required fields:
+%       * S      : m x n Stoichiometric Matrix
+%       * c      : n x 1 linear objective coefficients
+%       * lb     : n x 1 lower bounds on flux vector (the variables)
+%       * ub     : n x 1 upper bounds on flux vector
+%   Names        : A (q,1) cell array with the names of the models.
 %
 % OPTIONAL INPUTS:
 %
-%       * Alpha     : a double between 0 and 1. 
-%       * Modality  : 'full' or 'fast'
-%       * biomassIndex  : biomass flux exchange index (integer)
-%       * Exchanges : array (vector) with the exchanges (indices) of the model
-%       * vTol      : zero flux tolerance (double)
-%       * eTol      : zero epsilon tolerance (double)
-%       * Nullity   : false (default) to not calculate elementary matrix
+%   preCC        : A (q,2) struct with the metaCone results for each model
+%       * preCC(:,1) column should be the C_ext (matrices) ordered as Names
+%       * preCC(:,2) column should be the Output (structs) ordered as Names
+%   Alpha        : a double between 0 and 1. 
+%   Modality     : 'full' or 'fast' character string.
+%   biomassIndex : A vector of biomass exchanges indices (integers)
+%   Exchanges    : array (vector) with the exchanges (indices) of the model
+%   vTol         : zero flux tolerance (double)
+%   eTol         : zero epsilon tolerance (double)
+%   Nullity      : false (default) to not calculate elementary matrix
 %
 % OUTPUTS:
 %
-%       * QModel    : A struct with the main fields of a COBRA Model
-%       * CC        :
-%       * Output    : A structure with the following fields:
+%   QModel       : A struct with the main fields of a COBRA Model
+%   CC           :
+%   Output       : A structure with the following fields:
 %==========================================================================
 %% PARSING INPUTS ===
 %
@@ -86,12 +89,67 @@ disp(p.Results)
 %% INITIALIZATION ===
 
 
-% Arguments Extraction and Initialization
+% Arguments Extraction and Initialization ---
+models   = p.Results.models;
+q        = numel(models);
+Names    = p.Results.Names;
 vTol     = p.Results.vTol;
 eTol     = p.Results.eTol;
-Alpha    = p.Results.Alpha;
 Nullity  = p.Results.Nullity;
+CCRs     = p.Results.preCC;
+Alpha    = p.Results.Alpha;
 bioIDX   = p.Results.biomassIndex;
 Modality = p.Results.Modality;
+
+% Finding Biomass reaction ---
+if numel(bioIDX) == 1
+    foundBios = zeros(q,1); % indices of biomass rxns
+    
+    % We create the exception in case biomass rxn is not present.
+    e1Mess      = 'Some models without biomass rxn. Check cause of MException.last';
+    e1Ide       = 'QModelCreation:incompleteArguments';
+    e1Exception = MException(e1Ide, e1Mess);
+    for i = 1:q
+        model        = models{i};
+        temBios      = find(contains(model.rxnNames, 'biomass','IgnoreCase',true));
+        foundBios(i) = temBios(1);
+        if foundBios(i) == 0
+            disp('Oh Shit!')
+            mid_i       = 'QModelCreation:ModelWithoutBiomassRxn';
+            msg_i       = sprintf('%s model without biomass rxn',Names{i});
+            noBio       = MException(mid_i, msg_i);
+            e1Exception = addCause(e1Exception, noBio);
+        end
+    end
+    if any(foundBios==0)
+        throw(e1Exception);
+    end
+end
+
+%% BASES CALCULATION ===
+
+CCs = cell(q,1);
+Res = cell(q,1);
+
+if isempty(CCRs)
+    fprintf('No bases detected as argument.\n')
+    for i = 1:q
+        fprintf('Initializing metaCone() routine of %s\n',Names{i})
+        [CCs{i}, Res{i}] = metaCone(models{i},...
+            'Alpha',Alpha',...
+            'biomassIndex',bioIDX(i),...
+            'vTol',vTol,...
+            'eTol',eTol,...
+            'Nullity',Nullity,...
+            'Modality',Modality);
+        fprintf('Conversion Cone of %s completed\n',Names{i})
+    end
+else
+    CCs = CCRs(:,1);
+    Res = CCRs(:,2);
+end
+
+disp(bioIDX)
+disp(foundBios)
 
 end
