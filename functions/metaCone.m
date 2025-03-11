@@ -1,6 +1,6 @@
 function [CC, Output] = metaCone(model, varargin)
 %% 
-%MetaCon is a greedy LP-optimization based algorithm that aims to capture
+% MetaCon is a greedy LP-optimization based algorithm that aims to capture
 % the metabolic potential of a COBRA model via basis calculation of a
 % 'growing' Conversion Cone (CC); every conversion has a non-zero growth rate.
 % The output is an MxN matrix, with M exchange reactions and N conversion
@@ -313,22 +313,6 @@ end % of MetaCone function
 
 %==========================================================================
 %% COMPLEMENTARY SUBROUTINES
-
-% Subroutine to detect exchange reactions =================================
-function ExRxnIDs = extractExchanges(model)
-%Beta version 
-
-% Option 1
-ExRxns = findExcRxns(model);
-ExRxnIDs = findRxnIDs(model, model.rxns(ExRxns));
-
-% % Option 2
-% S = model.S;
-% ExRxnIDs = find((sum(S == 0)==(n_row-1) & sum(S == -1) == 1)); %Extract position of exchanges
-% 
-% % Option 3
-% ExRxnIDs = find(contains(model.rxns, 'EX_'));
-end
 
 % Subroutine to calculate Elementary Matrix with the exchange reactions ===
 function [ME, EMCons] = buildElementaryMatrixCons(model, ExRxnsIDs)
