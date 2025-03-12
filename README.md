@@ -1,4 +1,4 @@
-# Conversion Interactions
+# METACONE
 Identification of interaction networks based on metabolic conversions
 
 ## Contents
