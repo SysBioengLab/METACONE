@@ -22,32 +22,32 @@ function [CC, Output] = metaCone(model, varargin)
 %
 % INPUTS:
 %
-%   model        : COBRA model (structure) with the following required fields:
-%      * S      : m x n Stoichiometric Matrix
-%      * c      : n x 1 linear objective coefficients
-%      * lb     : n x 1 lower bounds on flux vector (the variables)
-%      * ub     : n x 1 upper bounds on flux vector
+%   model        : COBRA model (structure) with the required fields:
+%      * S       : m x n Stoichiometric Matrix
+%      * c       : n x 1 linear objective coefficients
+%      * lb      : n x 1 lower bounds on flux vector (the variables)
+%      * ub      : n x 1 upper bounds on flux vector
 %
 % OPTIONAL INPUTS:
 %
-%   Alpha        : a double between 0 and 1. 
-%   Modality     : 'full' or 'fast'
-%   biomassIndex : biomass flux exchange index (integer)
-%   Exchanges    : array (vector) with the exchanges (indices) of the model
-%   vTol         : zero flux tolerance (double)
-%   eTol         : zero epsilon tolerance (double)
-%   Nullity      : false (default) to not calculate elementary matrix
+%   Alpha          : a double between 0 and 1. 
+%   Modality       : 'full' or 'fast'
+%   biomassIndex   : biomass flux exchange index (integer)
+%   Exchanges      : array (vector) with the exchanges (indices) 
+%   vTol           : zero flux tolerance (double)
+%   eTol           : zero epsilon tolerance (double)
+%   Nullity        : false (default) to not calculate elementary matrix
 %
 % OUTPUTS:
 %
-%   CC           : A matrix (double) with conversions as columns.
-%   Output       : A structure with the following fields:
-%      * runtime
-%      * iters  : Nº of iteration the algorithm took.
-%      * noexch : Nº of exchange reactions found in the model.
-%      * noconv : Nº of columns of CC
-%      * nullity : 
-%      * mingrowth : minimum growth rate required for each conversion.
+%   CC             : A matrix (double) with conversions as columns.
+%   Output         : A structure with the following fields:
+%      * runtime   : Time in seconds the algorithm took.
+%      * iters     : Nº of iteration the algorithm took.
+%      * noexch    : Nº of exchange reactions found in the model.
+%      * noconv    : Nº of columns of CC
+%      * nullity   : 
+%      * mingrowth : Minimum growth rate required for each conversion.
 %      * exchanges : A table with the exchanges listed.
 %==========================================================================
 %% PARSING INPUTS ===
@@ -72,7 +72,7 @@ isNullityvalid      = @(nullity) ismember(nullity,[true, false]);
 isbioIDXvalid       = @(bioIDX) class(bioIDX) == "double";
 isExchsvalid        = @(exchs) or(iscellstr(exchs),isnumeric(exchs));
 isModalityvalid     = @(mod) ismember(mod, {'full','fast'});
-isBool              = @(b) or(class(b)=='logical',ismember(b, [0 1]));
+isBool              = @(b) or(class(b)=="logical",ismember(b, [0 1]));
 %isCobraModel as a subroutine
 
 % Parameters ---
