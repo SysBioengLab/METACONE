@@ -124,6 +124,8 @@ if numel(bioIDX) == 1
     if any(foundBios==0)
         throw(e1Exception);
     end
+else
+    foundBios = bioIDX;
 end
 
 %% BASES CALCULATION ===
@@ -131,25 +133,29 @@ end
 CCs = cell(q,1);
 Res = cell(q,1);
 
+disp(bioIDX)
+disp(foundBios)
+
 if isempty(CCRs)
     fprintf('No bases detected as argument.\n')
     for i = 1:q
         fprintf('Initializing metaCone() routine of %s\n',Names{i})
         [CCs{i}, Res{i}] = metaCone(models{i},...
             'Alpha',Alpha',...
-            'biomassIndex',bioIDX(i),...
+            'biomassIndex',foundBios(i),...
             'vTol',vTol,...
             'eTol',eTol,...
             'Nullity',Nullity,...
             'Modality',Modality);
-        fprintf('Conversion Cone of %s completed\n',Names{i})
+        fprintf('C_ext basis of %s completed\n',Names{i})
     end
 else
     CCs = CCRs(:,1);
     Res = CCRs(:,2);
 end
 
-disp(bioIDX)
-disp(foundBios)
+%% Q-MATRIX CALCULATION
+
+
 
 end
