@@ -17,16 +17,51 @@ load('./models/LS.mat'); LS = model;
 % should receive the same arguments, or 
 % Make sure you call the function according to your needs.
 
-Alpha         = 0.2; % fraction related to the maximum growth according to FBA
+Alpha         = 0.1; % fraction related to the maximum growth according to FBA
 Modality      = 'fast';
-Exchanges     = findRxnIDs(bmodel,bmodel.rxns(contains(bmodel.rxns,'EX_')));
-biomassIDX    = 0;
-keepAll       = true;
 eTol          = 1e-7;
 vTol          = 1e-8;
 
-%% RUNNING QModel
+%% RUNNING QModel (conversions from scratch)
+clc
 
-%% SHOWING THE RESULTS
+models = {PD, LS};
+Names  = split('PD LS');
+QM = QModelCreation(models, Names, ...
+                    'Alpha',Alpha, ...
+                    'Modality',Modality,...
+                    'eTol',eTol,...
+                    'vTol',vTol);
+disp(QM)
+figure(1)
+spy(QM.S); title("Q-Matrix of the PD-LS Q-Model")
 
-%% ANALYZING SOLUTIONS
+%% RUNNING QModel (pre-calculated conversions)
+
+% We obtain the conversions first.
+[ccD, rd] = metaCone(PD);
+[ccS, rs] = metaCone(LS);
+
+% We set up the structures necessary for the function.
+CCs    = {ccD , rd;...
+          ccS , rs};
+models = {PD; LS};
+Names  = {'PD'; 'LS'};
+
+% Calling QModelCreation
+QM     = QModelCreation(models, Names, 'preCC', CCs,...
+                                     'Alpha', Alpha,...
+                                     'Modality', Modality);
+fprintf('Q-Model between %s and %s finished\n', Names{1},Names{2})
+
+%% TESTING THE MODEL
+% FBA
+
+SCFA = {'EX_ac(e)';...
+        'EX_but(e)'; ...
+        'EX_lac_D(e)';...
+        'EX_lac_L(e)';...
+        'EX_succ(e)';...
+        'EX_ppa(e)'};
+QM_1 = changeObjective(QM, SCFA);
+sol  = optimizeCbModel(QM_1);
