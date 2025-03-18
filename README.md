@@ -1,5 +1,7 @@
 # METACONE
-Identification of interaction networks based on metabolic conversions
+Identification of interaction networks based on metabolic conversions.
+All the functions and scripts need to be run with the [COBRA Tool Box](https://opencobra.github.io/cobratoolbox/stable/index.html).
+All the functons and scripts were created and tested with Matlab, vresion R2020a, Update 8 (9.8.0.1873465).
 
 ## Contents
 * `example1_metaCone.m`: Simple script to demonstrate the use of the `metaCone()` algorithm.
