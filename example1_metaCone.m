@@ -43,6 +43,12 @@ disp([R.exchanges array2table(CC)])
 % Heatmap of the conversions
 figure(1)
 heatmap(CC)
+ax = gca;
+ax.Colormap = colormap_dorei_symb;
+ax.YDisplayLabels = extractBetween(R.exchanges.RxnName, 'EX_', '(e)');
+xlabel("Conversion Index")
+ylabel("Metabolite")
+title("Heatmap showing production/consumption fashion")
 
 % We will display one conversion as (macro-) chemical equation
 cci = CC(:, randi(size(CC,2)));
@@ -63,16 +69,29 @@ equation = join([leftSide rightSide],' -> ');
 
 disp(equation)
 
-%% ANALYZING 
+%% ANALYZING SOLUTIONS
+
+% Norm of Epsilon vectors
+norms = full(vecnorm(R.Epsilons));
 
 % Singular Value Decomposition
 [U, S] = svd(full(R.Allsol));
 
-figure(2)
+% Plotting the results
+figure(2); clf
 plot(1:min(size(S)), log10(diag(S)))
-xlabel('Ordered (descending) indices of singular values')
+xlabel('Ascending indices of singular values or Epsilons vectors')
 ylabel('Log_{10} singular values')
+hold on
+yyaxis right
+plot(1:numel(norms), norms)
+ylabel("2-norm of Epsilon vectors")
+title("Analysis of all solutions")
+xlim([0 22])
 
 % The logarithm of the singular values, when considering all the solutions
 % that metaCone can find, shows the at which number the singular values
 % drop to zero.
+
+% Each solution comes with an Epsilon vector which norms should be as close
+% to zero as possible.
