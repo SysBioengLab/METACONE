@@ -124,6 +124,8 @@ if numel(bioIDX) == 1
     if any(foundBios==0)
         throw(e1Exception);
     end
+else
+    foundBios = bioIDX;
 end
 
 %% BASES CALCULATION ===
@@ -131,25 +133,99 @@ end
 CCs = cell(q,1);
 Res = cell(q,1);
 
+disp(bioIDX)
+disp(foundBios)
+
 if isempty(CCRs)
     fprintf('No bases detected as argument.\n')
     for i = 1:q
         fprintf('Initializing metaCone() routine of %s\n',Names{i})
         [CCs{i}, Res{i}] = metaCone(models{i},...
             'Alpha',Alpha',...
-            'biomassIndex',bioIDX(i),...
+            'biomassIndex',foundBios(i),...
             'vTol',vTol,...
             'eTol',eTol,...
             'Nullity',Nullity,...
             'Modality',Modality);
-        fprintf('Conversion Cone of %s completed\n',Names{i})
+        fprintf('C_ext basis of %s completed\n',Names{i})
     end
 else
     CCs = CCRs(:,1);
     Res = CCRs(:,2);
 end
 
-disp(bioIDX)
-disp(foundBios)
+%% Q-MATRIX CALCULATION ===
+
+try
+    disp("Started Q-Matrix Calculation")
+    [Q, Output] = QMatrixCreation(Names, CCs, Res);
+catch ME
+    QModel = {CCs; Res};
+    disp(ME)
+    return
+end
+allExcs = Output.allExcs;
+
+%% Q-MODEL CONSTRUCTION ===
+% The model has the structure of a COBRA model.
+
+% We create the template of the model
+QModel      = createModel();
+QModel.S    = Q;
+QModel.c    = zeros(size(Q,2),1);
+QModel.b    = zeros(size(Q,1),1);
+QModel.lb   = repmat(-100, size(Q,2),1);
+QModel.ub   = repmat(100, size(Q,2),1);
+
+%We set the names of the columns of the Q Matrix
+QModel.rxns = {};
+nparts      = q + size(Q,1);
+Ctemp       = [];
+for i = 1:q
+    numccs          = size(CCs{i},2);
+    QModel.rxns     = [QModel.rxns;   strcat(join([repmat({'a_'},numccs,1) split(num2str(1:numccs))],''),Names{i})];
+    CtempBlock      = zeros(numccs,nparts);
+    CtempBlock(:,i) = ones(numccs,1);
+    Ctemp           = [Ctemp; CtempBlock];
+end
+QModel.rxns = [QModel.rxns; allExcs];
+% numel(QModel.rxns) == size(Q,2)
+
+%Participation Matrix
+Ctemp               = [Ctemp; zeros(size(Q,1),q) eye(size(Q,1))];
+if ~and(size(Ctemp,1)==size(Q,2), size(Ctemp,2)==nparts)
+    error('ERROR! Cp matrix was not properly built')
+end
+QModel.Cp = Ctemp;
+
+
+% Here, one must define which metabolites can only "enter", which can only
+% go out, and which can do both. 
+tempExLowerBounds = zeros(size(Q,1),q);
+tempExUpperBounds = tempExLowerBounds;
+for i = 1:length(models)
+    model = models{i};
+    exchanges = logical(findExcRxns(model)); %exchanges indexes
+
+    %Forward
+    forward = and(model.lb>=0, model.ub > 0); %forward reactions
+    fExrxns = model.rxns(logical(exchanges.*forward)); %forward exch rxns
+    tempExLowerBounds(:,i) = ismember(allExcs, fExrxns);
+
+    %Reverse
+    reverse = and(model.lb< 0, model.ub<= 0); %reverse reactoins
+    rExrxns = model.rxns(logical(exchanges.*reverse)); %reverse exch rxns
+    tempExUpperBounds(:,i) = ismember(allExcs, rExrxns);
+end
+
+forIrrev = sum(tempExLowerBounds, 2) == numel(models);
+QModel.lb(end-(size(forIrrev,1)-1):end) = (forIrrev==0)*(-1e3);
+revIrrev = sum(tempExUpperBounds, 2) == numel(models);
+QModel.ub(end-(size(forIrrev,1)-1):end) = (revIrrev==0)*(1e3);
+%QModel.lb(1:(end-size(Q,1))) = -100;
+QModel.lb(1:(end-size(Q,1))) = -0;
+
+QModel.mets = extractAfter(allExcs, 'EX_');
+QModel.rev = and(QModel.lb < 0, QModel.ub > 0);
 
 end
