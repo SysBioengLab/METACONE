@@ -154,8 +154,48 @@ else
     Res = CCRs(:,2);
 end
 
-%% Q-MATRIX CALCULATION
+%% Q-MATRIX CALCULATION ===
 
+try
+    disp("Started Q-Matrix Calculation")
+    [Q, Output] = QMatrixCreation(Names, CCs, Res);
+catch ME
+    QModel = {CCs; Res};
+    disp(ME)
+    return
+end
+
+%% Q-MODEL CONSTRUCTION ===
+% The model has the structure of a COBRA model.
+
+% We create the template of the model
+QModel      = createModel();
+QModel.S    = Q;
+QModel.c    = zeros(size(Q,2),1);
+QModel.b    = zeros(size(Q,1),1);
+QModel.lb   = repmat(-100, size(Q,2),1);
+QModel.ub   = repmat(100, size(Q,2),1);
+
+%We set the names of the columns of the Q Matrix
+QModel.rxns = {};
+nparts      = q + size(Q,1);
+Ctemp       = [];
+for i = 1:q
+    numccs          = size(CCs{i},2);
+    QModel.rxns     = [QModel.rxns;   strcat(join([repmat({'a_'},numccs,1) split(num2str(1:numccs))],''),Names{i})];
+    CtempBlock      = zeros(numccs,nparts);
+    CtempBlock(:,i) = ones(numccs,1);
+    Ctemp           = [Ctemp; CtempBlock];
+end
+QModel.rxns = [QModel.rxns; Output.allExcs];
+% numel(QModel.rxns) == size(Q,2)
+
+%Participation Matrix
+Ctemp               = [Ctemp; zeros(size(Q,1),q) eye(size(Q,1))];
+if ~and(size(Ctemp,1)==size(Q,2), size(Ctemp,2)==nparts)
+    error('ERROR! Cp matrix was not properly built')
+end
+QModel.Cp = Ctemp;
 
 
 end
