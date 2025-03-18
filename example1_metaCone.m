@@ -40,6 +40,10 @@ fprintf('\nRESULT: %i conversions found\n', R.noconv)
 
 disp([R.exchanges array2table(CC)])
 
+% Heatmap of the conversions
+figure(1)
+heatmap(CC)
+
 % We will display one conversion as (macro-) chemical equation
 cci = CC(:, randi(size(CC,2)));
 mets = extractBetween(R.exchanges.RxnName(cci ~= 0), 'EX_', '(e)');
@@ -55,5 +59,20 @@ cprod = cellfun(@num2str,num2cell(coeffs_prod),'UniformOutput',false);
 
 leftSide = join(join([csubs substrates])', ' + ');
 rightSide = join(join([cprod products])', ' + ');
-equation = join([leftSide rightSide],' -> ')
+equation = join([leftSide rightSide],' -> ');
+
+disp(equation)
+
 %% ANALYZING 
+
+% Singular Value Decomposition
+[U, S] = svd(full(R.Allsol));
+
+figure(2)
+plot(1:min(size(S)), log10(diag(S)))
+xlabel('Ordered (descending) indices of singular values')
+ylabel('Log_{10} singular values')
+
+% The logarithm of the singular values, when considering all the solutions
+% that metaCone can find, shows the at which number the singular values
+% drop to zero.
