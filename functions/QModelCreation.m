@@ -164,6 +164,7 @@ catch ME
     disp(ME)
     return
 end
+allExcs = Output.allExcs;
 
 %% Q-MODEL CONSTRUCTION ===
 % The model has the structure of a COBRA model.
@@ -187,7 +188,7 @@ for i = 1:q
     CtempBlock(:,i) = ones(numccs,1);
     Ctemp           = [Ctemp; CtempBlock];
 end
-QModel.rxns = [QModel.rxns; Output.allExcs];
+QModel.rxns = [QModel.rxns; allExcs];
 % numel(QModel.rxns) == size(Q,2)
 
 %Participation Matrix
@@ -197,5 +198,34 @@ if ~and(size(Ctemp,1)==size(Q,2), size(Ctemp,2)==nparts)
 end
 QModel.Cp = Ctemp;
 
+
+% Here, one must define which metabolites can only "enter", which can only
+% go out, and which can do both. 
+tempExLowerBounds = zeros(size(Q,1),q);
+tempExUpperBounds = tempExLowerBounds;
+for i = 1:length(models)
+    model = models{i};
+    exchanges = logical(findExcRxns(model)); %exchanges indexes
+
+    %Forward
+    forward = and(model.lb>=0, model.ub > 0); %forward reactions
+    fExrxns = model.rxns(logical(exchanges.*forward)); %forward exch rxns
+    tempExLowerBounds(:,i) = ismember(allExcs, fExrxns);
+
+    %Reverse
+    reverse = and(model.lb< 0, model.ub<= 0); %reverse reactoins
+    rExrxns = model.rxns(logical(exchanges.*reverse)); %reverse exch rxns
+    tempExUpperBounds(:,i) = ismember(allExcs, rExrxns);
+end
+
+forIrrev = sum(tempExLowerBounds, 2) == numel(models);
+QModel.lb(end-(size(forIrrev,1)-1):end) = (forIrrev==0)*(-1e3);
+revIrrev = sum(tempExUpperBounds, 2) == numel(models);
+QModel.ub(end-(size(forIrrev,1)-1):end) = (revIrrev==0)*(1e3);
+%QModel.lb(1:(end-size(Q,1))) = -100;
+QModel.lb(1:(end-size(Q,1))) = -0;
+
+QModel.mets = extractAfter(allExcs, 'EX_');
+QModel.rev = and(QModel.lb < 0, QModel.ub > 0);
 
 end
