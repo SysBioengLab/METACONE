@@ -57,12 +57,12 @@ NamesAbb = p.Results.NamesAbb;
 CCs      = p.Results.CCs;
 Rs       = p.Results.Rs;
 
-
 % % Variables Initialization ---
 nums     = numel(NamesAbb);
 allExcs  = {}; 
 Q        = [];
 Keys     = cell(1, nums);
+disp("Finished Arguments extraction and Initalization")
 
 %% COMMON EXCHANGES SET and NORMALIZATION ====
 for i = 1:numel(CCs)
@@ -97,6 +97,7 @@ for i = 1:numel(CCs)
     % Creating the exchanges union set.
     allExcs = union(allExcs, exchanges);
 end
+disp("Finished the ensambling of common exchanges")
 
 %% KEYS FOR EACH SPECIES ====
 for i = 1:nums
@@ -114,6 +115,7 @@ for i = 1:nums
     end
     Keys{i} = tempKey;
 end; clear i
+disp("Finished mapping conversion entries per species")
 
 %% Q-MATRIX REARRANGE ====
 
@@ -126,6 +128,7 @@ for i = 1:nums
     Qtemp(tempInd,:) = conversions(Keys{i},:);
     Q = [Q, Qtemp];
 end
+disp("Finished gluing all conversions together")
 
 % Adding the community exchanges
 % "easy approach": each metabolite has a secreting echange reaction of the

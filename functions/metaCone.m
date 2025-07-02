@@ -116,6 +116,11 @@ switch class(ExRxns)
     case 'double'
         ExRxnIDs = ExRxns;
 end
+% disp(model.rxns(ExRxnIDs)) %small script for some check 13/06/25
+% a = input("Continua? :\n");
+% if a=="N"
+%     return
+% end
 
 % Finding Biomass reaction ---
 if bioIDX == 0
@@ -222,6 +227,7 @@ while true
             
             % TERMINATION .................
             if all(EpsilonsK==0)
+                disp("All Epsilons are too small")
                 break
             elseif k == noexch
                 break
@@ -331,8 +337,9 @@ ExRxnIDs = findRxnIDs(model, model.rxns(ExRxns));
 
 % % Option 2
 % S = model.S;
-% ExRxnIDs = find((sum(S == 0)==(n_row-1) & sum(S == -1) == 1)); %Extract position of exchanges
-% 
+% n_row    = size(S,1);
+% ExRxnIDs = find((sum(S == 0)==(n_row-1) & sum(S == -1) == 1))'; %Extract position of exchanges
+
 % % Option 3
 % ExRxnIDs = find(contains(model.rxns, 'EX_'));
 end
