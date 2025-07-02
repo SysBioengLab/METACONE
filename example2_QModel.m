@@ -8,8 +8,9 @@ changeCobrasolver('gurobi','ALL');
 
 % load('./models/toymodel1_bio.mat')
 % load('./models/bmodel.mat')
-load('./models/PD.mat'); PD = model;
-load('./models/LS.mat'); LS = model;
+% load('./models/iML1515.mat')
+load('./models/Bacteroides_dorei_DSM_17855.mat'); BdD = model;
+load('./models/Clostridium_symbiosum_WAL_14673.mat'); CsW = model;
 % load('./models/yeast-GEM.mat'); yeast8 = model; clear model
 
 %% SETTING PARAMETERS
@@ -25,8 +26,8 @@ vTol          = 1e-8;
 %% RUNNING QModel (conversions from scratch)
 clc
 
-models = {PD, LS};
-Names  = split('PD LS');
+models = {BdD, CsW};
+Names  = split('BdD CsW');
 QM = QModelCreation(models, Names, ...
                     'Alpha',Alpha, ...
                     'Modality',Modality,...
@@ -34,19 +35,19 @@ QM = QModelCreation(models, Names, ...
                     'vTol',vTol);
 disp(QM)
 figure(1)
-spy(QM.S); title("Q-Matrix of the PD-LS Q-Model")
+spy(QM.S); title("Q-Matrix of the BdD-CsW Q-Model")
 
 %% RUNNING QModel (pre-calculated conversions)
 
 % We obtain the conversions first.
-[ccD, rd] = metaCone(PD);
-[ccS, rs] = metaCone(LS);
+[ccD, rd] = metaCone(BdD);
+[ccS, rs] = metaCone(CsW);
 
 % We set up the structures necessary for the function.
 CCs    = {ccD , rd;...
           ccS , rs};
-models = {PD; LS};
-Names  = {'PD'; 'LS'};
+models = {BdD; CsW};
+Names  = {'BdD'; 'CsW'};
 
 % Calling QModelCreation
 QM     = QModelCreation(models, Names, 'preCC', CCs,...
@@ -64,4 +65,4 @@ SCFA = {'EX_ac(e)';...
         'EX_succ(e)';...
         'EX_ppa(e)'};
 QM_1 = changeObjective(QM, SCFA);
-sol  = optimizeCbModel(QM_1);
+sol  = optimizeCbModel(QM_1)
