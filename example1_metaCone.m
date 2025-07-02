@@ -9,8 +9,8 @@ changeCobrasolver('gurobi','ALL');
 % load('./models/toymodel1_bio.mat')
 load('./models/bmodel.mat')
 % load('./models/iML1515.mat')
-% load('./models/PD.mat'); PD = model;
-% load('./models/LS.mat'); LS = model;
+% load('./models/Bacteroides_dorei_DSM_17855.mat'); BdD = model;
+% load('./models/Clostridium_symbiosum_WAL_14673.mat'); CsW = model;
 % load('./models/yeast-GEM.mat'); yeast8 = model; clear model
 
 %% SETTING PARAMETERS
