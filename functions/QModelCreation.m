@@ -64,7 +64,7 @@ default_Modality    = 'fast';
 isModelsOk          = @(models) all(cellfun(@isCobraModel, models));
 isAlphaOk           = @(a) and(isnumeric(a), a >= 0 & a <= 1);
 isNullityvalid      = @(nullity) ismember(nullity,[true, false]);
-isbioIDXvalid       = @(bi) and(size(bi)==size(models), isnumeric(bi));
+isbioIDXvalid       = @(bi) and(all(size(bi)==size(models)), isnumeric(bi));
 % isExchsvalid        = @(exchs) or(iscellstr(exchs),isnumeric(exchs));
 isModalityvalid     = @(mod) ismember(mod, {'full','fast'});
 isvTolok            = @(vTol) and(vTol < .1, vTol > 0);
@@ -227,6 +227,9 @@ QModel.ub(end-(size(forIrrev,1)-1):end) = (revIrrev==0)*(1e3);
 QModel.lb(1:(end-size(Q,1))) = -0;
 
 QModel.mets = extractAfter(allExcs, 'EX_');
-QModel.rev = and(QModel.lb < 0, QModel.ub > 0);
+QModel.rev  = and(QModel.lb < 0, QModel.ub > 0);
+QModel.CCs  = CCs;
+QModel.Res  = Res;
+
 
 end
