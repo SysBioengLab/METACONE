@@ -26,8 +26,10 @@ All the functons and scripts were created and tested with Matlab, vresion R2020a
 ### Usage
 
 All presented functions can be used independently, but a few remarks are necessary. 
+
 The `metaCone()` function will take one model as input, with certain parameters, and the main output will be a matrix (C_ext).
 The usage of `metaCone()` is explained in the `example1_metaCone.m`.
+
 The `QMatrixCreation()` is used internally and automatically by `QModelCreation()`, as well as `metaCone()`, but previously
 calculated matrices, one for each model to be included, can be provided as argument.
 The usage of `QModelCreation()` is explained in the `example2_QModel.m`.
