@@ -11,7 +11,7 @@ All the functons and scripts were created and tested with Matlab, vresion R2020a
 
 ### Models
 
-1. `toymodel1.bio`: Toy model with 15 internal reactions (including transport reactions) and 8 exchange reaction, with a mock-biomass reaction.
+1. `toymodel1_bio`: Toy model with 15 internal reactions (including transport reactions) and 8 exchange reaction, with a mock-biomass reaction.
 2. `bmodel`       : E. coli "core" model with the `EX_biomass(e)` reaction added and its respective metabolite.
 3. `LS`           : Slightly modified `Clostridium_clostridioforme_CM201` model found in VMH.
 4. `PD`           : Slightly modified `Bacteroides_dorei_DSM_17855` model found in VMH.
