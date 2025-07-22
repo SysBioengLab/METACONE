@@ -1,6 +1,6 @@
 # METACONE
 Identification of interaction networks based on metabolic conversions.
-All the functions and scripts need to be run with the [COBRA Tool Box](https://opencobra.github.io/cobratoolbox/stable/index.html).
+All the functions and scripts need to be run with the [COBRA Toolbox](https://opencobra.github.io/cobratoolbox/stable/index.html).
 All the functons and scripts were created and tested with Matlab, vresion R2020a, Update 8 (9.8.0.1873465).
 
 ## Contents
@@ -18,6 +18,6 @@ All the functons and scripts were created and tested with Matlab, vresion R2020a
 
 ### Functions
 
-1. `metaCone`:
-2. `QMatrixCreation`:
-3. `QModelCreation`: 
+1. `metaCone`: Runs the METACONE algorithm.
+2. `QMatrixCreation`: Builds the stoichiometric matrix describing a consortium and its community exchanges.
+3. `QModelCreation`:  Builds a model structure for the entire consortium.
